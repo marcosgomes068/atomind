@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar-invisivel">
+        <span>Atomai</span>
+        <svg class="icon-atom" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 32 32" fill="none">
+          <g>
+            <circle cx="16" cy="16" r="2.5" fill="#3b82f6"/>
+            <g stroke="#3b82f6" stroke-width="1.5">
+              <ellipse rx="11" ry="4.5" cx="16" cy="16" fill="none"/>
+              <ellipse rx="11" ry="4.5" cx="16" cy="16" fill="none" transform="rotate(60 16 16)"/>
+              <ellipse rx="11" ry="4.5" cx="16" cy="16" fill="none" transform="rotate(120 16 16)"/>
+            </g>
+          </g>
+        </svg>
+    </nav>
+    <div class="chat-scroll-container">
+        <!-- Mensagens serão adicionadas via JS -->
+    </div>    <div class="input-container">
+        <input class="input-texto" type="text" placeholder="Digite algo...">
+        <button class="btn-enviar" title="Enviar mensagem">
+            <!-- Ícone Heroicons: Paper Airplane -->
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 19.5l16.5-7.5-16.5-7.5v6.75l11.25 0-11.25 0v6.75z"/>
+            </svg>
+        </button>
+        <button class="btn-mic" title="Ouvir microfone">
+            <!-- Ícone Heroicons: Microphone (correto) -->
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.25v2.25m0 0h3m-3 0h-3m6-6a6 6 0 01-12 0m12 0V7.5a3 3 0 00-6 0v5.25a3 3 0 006 0z"/>
+            </svg>
+        </button>
+        <button class="btn-img" title="Gerar imagem">
+            <!-- Ícone Heroicons: Photo -->
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>
+            </svg>
+        </button>
+    </div>    <script>
+      const input = document.querySelector('.input-texto');
+      const btnEnviar = document.querySelector('.btn-enviar');
+      const chat = document.querySelector('.chat-scroll-container');
+      const btnMic = document.querySelector('.btn-mic');
+      const btnImg = document.querySelector('.btn-img');
+      let recognition;
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.lang = 'pt-BR';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        btnMic.addEventListener('click', () => {
+          recognition.start();
+          btnMic.classList.add('gravando');
+        });
+        recognition.onresult = function(event) {
+          const texto = event.results[0][0].transcript;
+          input.value = texto;
+          input.focus();
+        };
+        recognition.onend = function() {
+          btnMic.classList.remove('gravando');
+        };
+        recognition.onerror = function() {
+          btnMic.classList.remove('gravando');
+        };
+      } else {
+        btnMic.addEventListener('click', () => {
+          alert('Reconhecimento de voz não suportado neste navegador.');
+        });
+      }      async function enviarPergunta() {
+        const pergunta = input.value.trim();
+        if (!pergunta) return;
+        // Adiciona pergunta do usuário
+        const userMsg = document.createElement('div');
+        userMsg.className = 'chat-msg user';
+        userMsg.textContent = pergunta;
+        chat.appendChild(userMsg);
+        chat.scrollTop = chat.scrollHeight;
+        input.value = '';
+        
+        // Adiciona mensagem de carregamento
+        const botMsg = document.createElement('div');
+        botMsg.className = 'chat-msg bot';
+        
+        // Cria a animação de carregamento
+        const loadingText = document.createElement('span');
+        loadingText.textContent = 'Pensando';
+        loadingText.className = 'loading-dots';
+        botMsg.appendChild(loadingText);
+        
+        chat.appendChild(botMsg);
+        chat.scrollTop = chat.scrollHeight;
+        
+        // Chama o backend Flask local
+        try {
+          const response = await fetch('/api/perguntar', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ pergunta })
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Erro HTTP: ${response.status} - ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          // Substitui a mensagem de carregamento pela resposta com animação de digitação
+          animateTypingEffect(botMsg, data.resposta || 'Erro ao obter resposta.');
+        } catch (e) {
+          console.error('Erro:', e);
+          botMsg.textContent = `Erro ao conectar ao backend: ${e.message}`;
+        }
+        chat.scrollTop = chat.scrollHeight;
+      }
+      
+      // Função para animar o efeito de digitação
+      function animateTypingEffect(element, text) {
+        // Limpa o conteúdo atual
+        element.innerHTML = '';
+        
+        // Cria um elemento de texto para a animação
+        const textContainer = document.createElement('span');
+        element.appendChild(textContainer);
+        
+        // Adiciona cursor piscante
+        const cursor = document.createElement('span');
+        cursor.className = 'blinking-cursor';
+        element.appendChild(cursor);
+        
+        let index = 0;
+        const speed = 15; // velocidade da digitação em milissegundos
+        
+        // Função para adicionar caracteres um por um
+        function typeWriter() {
+          if (index < text.length) {
+            textContainer.textContent += text.charAt(index);
+            index++;
+            chat.scrollTop = chat.scrollHeight;
+            setTimeout(typeWriter, speed);
+          } else {
+            // Remove o cursor quando terminar
+            element.removeChild(cursor);
+          }
+        }
+        
+        // Inicia a animação de digitação
+        typeWriter();
+      }      btnEnviar.addEventListener('click', enviarPergunta);
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') enviarPergunta();
+      });
+      
+      // Função para gerar imagem
+      async function gerarImagem() {
+        const prompt = input.value.trim();
+        if (!prompt) {
+          alert('Por favor, digite uma descrição para a imagem!');
+          return;
+        }
+        
+        // Adiciona mensagem do usuário
+        const userMsg = document.createElement('div');
+        userMsg.className = 'chat-msg user';
+        userMsg.textContent = `Gerar imagem: ${prompt}`;
+        chat.appendChild(userMsg);
+        chat.scrollTop = chat.scrollHeight;
+        
+        // Limpa o input
+        input.value = '';
+        
+        // Adiciona mensagem de carregamento
+        const botMsg = document.createElement('div');
+        botMsg.className = 'chat-msg bot';
+        
+        // Cria a animação de carregamento
+        const loadingText = document.createElement('span');
+        loadingText.textContent = 'Gerando imagem';
+        loadingText.className = 'loading-dots';
+        botMsg.appendChild(loadingText);
+        
+        chat.appendChild(botMsg);
+        chat.scrollTop = chat.scrollHeight;
+        
+        try {
+          // Chama o backend para gerar a imagem
+          const response = await fetch('/api/gerar-imagem', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ prompt })
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Erro HTTP: ${response.status} - ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+            if (data.status === 'loading') {
+            // O modelo está carregando, informar o usuário e tentar novamente após alguns segundos
+            botMsg.innerHTML = 'O modelo de IA está sendo carregado. Tentando novamente em 5 segundos...';
+            
+            setTimeout(() => {
+              gerarImagem();
+            }, 5000);
+            return;
+          }
+          
+          if (data.erro) {
+            botMsg.textContent = `Erro ao gerar imagem: ${data.erro}`;
+          } else {
+            // Limpa o texto de carregamento
+            botMsg.innerHTML = data.fallback 
+              ? 'Não foi possível gerar a imagem com IA, usando imagem alternativa:' 
+              : 'Imagem gerada baseada na sua descrição:';
+            
+            // Adiciona a imagem
+            const img = document.createElement('img');
+            img.src = data.imagem_url;
+            img.alt = prompt;
+            img.className = 'chat-img';
+            img.loading = 'lazy';
+            
+            // Adiciona listener para erro de carregamento
+            img.onerror = () => {
+              console.error('Erro ao carregar imagem:', data.imagem_url);
+              
+              // Tentar com fallback Unsplash
+              const unsplashUrl = `https://source.unsplash.com/800x500/?${prompt.replace(/\s+/g, ',')}`;
+              img.src = unsplashUrl;
+              botMsg.querySelector('br')?.remove();
+              botMsg.innerHTML = 'Não foi possível carregar a imagem da IA. Usando alternativa:';
+              botMsg.appendChild(document.createElement('br'));
+              botMsg.appendChild(img);
+              
+              // Se o fallback também falhar
+              img.onerror = () => {
+                img.remove();
+                botMsg.innerHTML = 'Não foi possível carregar a imagem. Tente uma descrição diferente.';
+              };
+            };
+            
+            // Adiciona listener para ver imagem ampliada
+            img.addEventListener('click', () => {
+              showImageModal(data.imagem_url, prompt);
+            });
+            
+            // Adiciona imagem à mensagem
+            botMsg.appendChild(document.createElement('br'));
+            botMsg.appendChild(img);
+          }
+        } catch (e) {
+          console.error('Erro:', e);
+          botMsg.textContent = `Erro ao gerar imagem: ${e.message}`;
+        }
+        
+        chat.scrollTop = chat.scrollHeight;
+      }
+        // Função para mostrar modal com imagem ampliada
+      function showImageModal(src, alt) {
+        // Verifica se já existe um modal e remove
+        const existingModal = document.querySelector('.img-modal');
+        if (existingModal) {
+          document.body.removeChild(existingModal);
+        }
+        
+        // Cria o modal
+        const modal = document.createElement('div');
+        modal.className = 'img-modal';
+        
+        // Adiciona a imagem
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = alt;
+        
+        // Indicador de carregamento
+        const loading = document.createElement('div');
+        loading.className = 'modal-loading';
+        loading.innerHTML = 'Carregando imagem...';
+        modal.appendChild(loading);
+        
+        // Adiciona handler de erro
+        img.onerror = () => {
+          loading.innerHTML = 'Erro ao carregar imagem em tamanho grande';
+          setTimeout(() => {
+            document.body.removeChild(modal);
+          }, 2000);
+        };
+        
+        // Quando a imagem carregar, oculta o indicador
+        img.onload = () => {
+          loading.style.display = 'none';
+        };
+        
+        // Adiciona a imagem ao modal
+        modal.appendChild(img);
+        
+        // Fecha o modal ao clicar
+        modal.addEventListener('click', () => {
+          document.body.removeChild(modal);
+        });
+        
+        // Adiciona o modal ao corpo do documento
+        document.body.appendChild(modal);
+        
+        // Torna o modal visível após um pequeno atraso para a animação funcionar
+        setTimeout(() => {
+          modal.classList.add('active');
+        }, 10);
+      }
+      
+      // Adiciona evento de clique ao botão de imagem
+      btnImg.addEventListener('click', gerarImagem);
+    </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+# Ambiente virtual
+venv/
+env/
+ENV/
+
+# Arquivos de configuração com senhas
+.env
+.flaskenv
+
+# Cache do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Logs
+*.log
+
+# Arquivos gerados localmente
+pag/imagens_geradas/
+
+# Dependências
+node_modules/
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
